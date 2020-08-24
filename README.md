@@ -32,3 +32,4 @@ java -jar macTool.jar REPOSITORY_PATH REPOSITORY_PATH REPOSITORY_PATH
 - Catarina Costa (joined in Aug 2018) 
 - Bruno Trindade (joined in Aug 2018) 
 - José William (joined in Aug 2019)
+- João Felipe (joined in May 2020)
