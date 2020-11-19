@@ -36,6 +36,12 @@ public class MACTool
     		"Devs 1", "Devs 2", "Different devs", "Same devs", "Devs intersection", 
     		"Commits 1", "Commits 2", "Changed files 1", "Changed files 2", "Changed files intersection", "Has conflict?", "Conflicted Files", "Chunks"};
 	
+	public static final String TEMP_HEADEDR[] = {"Hash", "Merge timestamp", "Lines add B1", "Lines rm B1", "Lines add B2", "Lines rm B2"};
+	
+	public static boolean CHECK_CONFLICT = false;
+	
+	public static boolean TEMP = true;
+	
 	public static void main(String[] args)
 	{
 		for(int i = 0; i < args.length; i++)
@@ -48,6 +54,7 @@ public class MACTool
 				runAnalysis();
 			}
 			catch(NullPointerException ex) {
+				ex.printStackTrace();
 				System.out.println("\tInvalid repository!");
 			}
 			System.out.println("Finished\n");
@@ -59,7 +66,10 @@ public class MACTool
 		MergeFilesDao mergeFilesDao = new MergeFilesDao();
 		MergeCommitsDao mergeCommitsDao = new MergeCommitsDao(repos.getProject());
 
-        ArrayList<String> linesConflito = new ArrayList<String>(), linesGeral = new ArrayList<String>();
+        ArrayList<String> linesConflito = new ArrayList<String>(), 
+        		linesGeral = new ArrayList<String>(),
+        		linesTemp = new ArrayList<String>();
+        
         List<String> merges = repos.getListOfMerges();
         int max = merges.size(), cont = 0;
         
@@ -180,65 +190,80 @@ public class MACTool
             catch(NullPointerException npe)
             {}
             
+            //=============// Linhas modificadas //==================//
+            List<String> diffBaseP1 = getDiffBetweenCommits(merge.getHashBase(), merge.getParents()[0]);
+            List<String> diffBaseP2 = getDiffBetweenCommits(merge.getHashBase(), merge.getParents()[1]);
+            
+            Integer linesP1[] = getCountDiffLines(diffBaseP1);
+            Integer linesP2[] = getCountDiffLines(diffBaseP2);
+            
             //================// Conflitos //==============//
-            int arquivos = RevisionAnalyzer.hasConflictNum(repos.getProject().toString(), merge.getParents()[0], merge.getParents()[1]);
-            int contAmbos = 0, contNull = 0;
-            int chunks = 0;
-            boolean conflito = false;
-        	String descricaoArquivos = "";
-        	
-        	//Removendo untracked files
-            cleanUntrackedFiles();
-            if(arquivos > 0) //Se o número de arquivos em conflito for positivo 
-            {
-            	//=======// Chunks //=======//
-                conflito = true;                
-                for(String line : RunGit.getListOfResult("git diff", repos.getProject()))
-                	if(line.replace("+","").startsWith("======="))
-                		chunks++;
+            if(CHECK_CONFLICT) {
+            	int arquivos = RevisionAnalyzer.hasConflictNum(repos.getProject().toString(), merge.getParents()[0], merge.getParents()[1]);
+            	int contAmbos = 0, contNull = 0;
+            	int chunks = 0;
+            	boolean conflito = false;
+            	String descricaoArquivos = "";
             	
-            	//=======// Arquivos //=======//
-            	//System.out.println("git diff --name-only --diff-filter=U");
-            	List<String> arquivosList = RunGit.getListOfResult("git diff --name-only --diff-filter=U", repos.getProject());
-            	
-                if(numIntersec > 0)
-                {
-                	//Gerando a lista de arquivos em conflito
-                	HashMap<String, ConflictedFile> ac = new HashMap<String, ConflictedFile>();
-                	for(String arquivo : arquivosList)
-                	{
-                		ConflictedFile aux = new ConflictedFile(arquivo);
-                		aux.setDeleted(checkDeletedFile(aux.getFileName()));                		
-                		ac.put(arquivo, aux);
-                	}
-                	
-                	if(ac.size() > 0)
-                	{
-                		checkWhoCausedConflict(merge.getHashBase(), merge.getParents()[0], ac, 0);
-                		checkWhoCausedConflict(merge.getHashBase(), merge.getParents()[1], ac, 1);
-                		
-                		//Verificando se o mesmo causou o conflito dos dois lados
-                		for (Entry<String, ConflictedFile> entry : ac.entrySet()) 
-                		{
-                			if(entry.getValue().getAuthor(0) != null && entry.getValue().getAuthor(0).equals(entry.getValue().getAuthor(1)))
-                				contAmbos += 1;
-                			else if(entry.getValue().getAuthor(0) == null || entry.getValue().getAuthor(1) == null)
-                				contNull += 1;
-                			else
-                				descricaoArquivos += String.format("%s,%s,%s;", entry.getValue().getFileName(), entry.getValue().getAuthor(0), entry.getValue().getAuthor(1));
-                		}
-                	}
-                }
-                linesConflito.add(merge.getHash()+","+numIntersec+","+arquivos+","+contAmbos+","+contNull+","+((double)contAmbos/arquivos)+","+descricaoArquivos);
+            	//Removendo untracked files
+            	cleanUntrackedFiles();
+            	if(arquivos > 0) //Se o número de arquivos em conflito for positivo 
+            	{
+            		//=======// Chunks //=======//
+            		conflito = true;                
+            		for(String line : RunGit.getListOfResult("git diff", repos.getProject()))
+            			if(line.replace("+","").startsWith("======="))
+            				chunks++;
+            		
+            		//=======// Arquivos //=======//
+            		//System.out.println("git diff --name-only --diff-filter=U");
+            		List<String> arquivosList = RunGit.getListOfResult("git diff --name-only --diff-filter=U", repos.getProject());
+            		
+            		if(numIntersec > 0)
+            		{
+            			//Gerando a lista de arquivos em conflito
+            			HashMap<String, ConflictedFile> ac = new HashMap<String, ConflictedFile>();
+            			for(String arquivo : arquivosList)
+            			{
+            				ConflictedFile aux = new ConflictedFile(arquivo);
+            				aux.setDeleted(checkDeletedFile(aux.getFileName()));                		
+            				ac.put(arquivo, aux);
+            			}
+            			
+            			if(ac.size() > 0)
+            			{
+            				checkWhoCausedConflict(merge.getHashBase(), merge.getParents()[0], ac, 0);
+            				checkWhoCausedConflict(merge.getHashBase(), merge.getParents()[1], ac, 1);
+            				
+            				//Verificando se o mesmo causou o conflito dos dois lados
+            				for (Entry<String, ConflictedFile> entry : ac.entrySet()) 
+            				{
+            					if(entry.getValue().getAuthor(0) != null && entry.getValue().getAuthor(0).equals(entry.getValue().getAuthor(1)))
+            						contAmbos += 1;
+            					else if(entry.getValue().getAuthor(0) == null || entry.getValue().getAuthor(1) == null)
+            						contNull += 1;
+            					else
+            						descricaoArquivos += String.format("%s,%s,%s;", entry.getValue().getFileName(), entry.getValue().getAuthor(0), entry.getValue().getAuthor(1));
+            				}
+            			}
+            		}
+            		linesConflito.add(merge.getHash()+","+numIntersec+","+arquivos+","+contAmbos+","+contNull+","+((double)contAmbos/arquivos)+","+descricaoArquivos);
+            	}
+            	linesGeral.add(merge.getHash()+","+mergeTimestamp+","+branchingTime+","+isolamentoMerge+","+committers1+","+committers2+","+diffCommitters+","+sameCommitters+","+
+            			numIntersec+","+commits1+","+commits2+","+arquivosAlterados1+","+arquivosAlterados2+","+arqIntersec+","+ (conflito ? "YES" : "NO") +","+arquivos+","+chunks);
             }
             
-            linesGeral.add(merge.getHash()+","+mergeTimestamp+","+branchingTime+","+isolamentoMerge+","+committers1+","+committers2+","+diffCommitters+","+sameCommitters+","+
-            		numIntersec+","+commits1+","+commits2+","+arquivosAlterados1+","+arquivosAlterados2+","+arqIntersec+","+ (conflito ? "YES" : "NO") +","+arquivos+","+chunks);
+            if(TEMP)
+            	linesTemp.add(merge.getHash()+","+mergeTimestamp+","+linesP1[0]+","+linesP1[1]+","+linesP2[0]+","+linesP2[1]);
         }
         try
         {
-	        Export.toCSV(repos, "conflict", CONFLICT_HEADER, linesConflito);
-	        Export.toCSV(repos, "general", GENERAL_HEADER, linesGeral);
+        	if(!TEMP) {
+        		Export.toCSV(repos, "conflict", CONFLICT_HEADER, linesConflito);
+        		Export.toCSV(repos, "general", GENERAL_HEADER, linesGeral);
+        	}
+        	else
+        		Export.toCSV(repos, "lines", TEMP_HEADEDR, linesTemp);
         }
         catch(StringIndexOutOfBoundsException ex)
         {
@@ -414,6 +439,32 @@ public class MACTool
 	public static void cleanUntrackedFiles()
 	{
 		RunGit.getResult("git clean -df", repos.getProject());
+	}
+	
+	public static List<String> getDiffBetweenCommits(String hashA, String hashB) {
+		return RunGit.getListOfResult(String.format("git diff %s %s", hashA, hashB), repos.getProject());
+	}
+	
+	public static Integer[] getCountDiffLines(List<String> lines) {
+		boolean diff = false, at = false;
+		int add = 0, rm = 0;
+		
+		for(String line : lines) {
+			if(line.startsWith("diff ")) {
+				diff = true;
+				at = false;
+			}
+			else if(line.startsWith("@@ "))
+				at = true;
+			else if(diff && at) {
+				if(line.startsWith("+"))
+					add += 1;
+				else if(line.startsWith("-"))
+					rm += 1;
+			}
+		}
+		
+		return new Integer[]{add, rm};
 	}
 }
 

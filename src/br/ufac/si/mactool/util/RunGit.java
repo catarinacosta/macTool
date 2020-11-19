@@ -88,7 +88,7 @@ public class RunGit {
                 }
             }
         } catch (IOException e) {
-            //System.out.println(e);
+            System.out.println(e);
             //Logger.getLogger(RunGit.class.getName()).log(Level.SEVERE, null, e);
         }
         return stdInput;
