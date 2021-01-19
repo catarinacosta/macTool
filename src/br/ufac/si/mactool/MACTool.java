@@ -3,6 +3,7 @@ package br.ufac.si.mactool;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -38,9 +39,11 @@ public class MACTool
 	
 	public static final String TEMP_HEADEDR[] = {"Hash", "Merge timestamp", "Lines add B1", "Lines rm B1", "Lines add B2", "Lines rm B2"};
 	
-	public static boolean CHECK_CONFLICT = false;
+	public static final String DEV_HEADEDR[] = {"Dev name", "Cases of conflict"};
 	
-	public static boolean TEMP = true;
+	public static boolean CHECK_CONFLICT = true;
+	
+	public static boolean TEMP = false;
 	
 	public static void main(String[] args)
 	{
@@ -73,9 +76,12 @@ public class MACTool
         List<String> merges = repos.getListOfMerges();
         int max = merges.size(), cont = 0;
         
+        HashMap<String, Integer> devs = new LinkedHashMap<String, Integer>();
+        
         for(String hashMerge : merges)  {
         	
             hashMerge = hashMerge.split(" ")[0];
+            
             MergeFiles merge = mergeFilesDao.getMerge(hashMerge, repos.getProject());
             
             try {
@@ -238,6 +244,17 @@ public class MACTool
             				//Verificando se o mesmo causou o conflito dos dois lados
             				for (Entry<String, ConflictedFile> entry : ac.entrySet()) 
             				{
+            					for(int i = 0; i < 2; i++) {
+            						if(entry.getValue().getAuthor(i) != null) {
+            							String name = entry.getValue().getAuthor(i);
+            							int val = 1;
+            							if(devs.containsKey(name)) 
+            								val += devs.get(name);
+            								
+            							devs.put(name, val);
+            						}
+            					}
+            					
             					if(entry.getValue().getAuthor(0) != null && entry.getValue().getAuthor(0).equals(entry.getValue().getAuthor(1)))
             						contAmbos += 1;
             					else if(entry.getValue().getAuthor(0) == null || entry.getValue().getAuthor(1) == null)
@@ -261,6 +278,12 @@ public class MACTool
         	if(!TEMP) {
         		Export.toCSV(repos, "conflict", CONFLICT_HEADER, linesConflito);
         		Export.toCSV(repos, "general", GENERAL_HEADER, linesGeral);
+        		
+        		ArrayList<String> linesDev = new ArrayList<String>();
+        		for (Entry<String, Integer> dev : devs.entrySet()) 
+        			linesDev.add(dev.getKey()+","+dev.getValue());
+        		
+        		Export.toCSV(repos, "dev", DEV_HEADEDR, linesDev);
         	}
         	else
         		Export.toCSV(repos, "lines", TEMP_HEADEDR, linesTemp);
