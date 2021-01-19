@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map.Entry;
 
 import br.ufac.si.mactool.experiment.RevisionAnalyzer;
+import br.ufac.si.mactool.model.ConflictCommitter;
 import br.ufac.si.mactool.model.ConflictedFile;
 import br.ufac.si.mactool.util.Export;
 import br.ufac.si.mactool.util.RunGit;
@@ -39,7 +40,7 @@ public class MACTool
 	
 	public static final String TEMP_HEADEDR[] = {"Hash", "Merge timestamp", "Lines add B1", "Lines rm B1", "Lines add B2", "Lines rm B2"};
 	
-	public static final String DEV_HEADEDR[] = {"Dev name", "Cases of conflict"};
+	public static final String DEV_HEADEDR[] = {"Dev name", "Cases of conflict", "Cases of self-conflict"};
 	
 	public static boolean CHECK_CONFLICT = true;
 	
@@ -76,7 +77,7 @@ public class MACTool
         List<String> merges = repos.getListOfMerges();
         int max = merges.size(), cont = 0;
         
-        HashMap<String, Integer> devs = new LinkedHashMap<String, Integer>();
+        HashMap<String, ConflictCommitter> devs = new LinkedHashMap<String, ConflictCommitter>();
         
         for(String hashMerge : merges)  {
         	
@@ -247,20 +248,30 @@ public class MACTool
             					for(int i = 0; i < 2; i++) {
             						if(entry.getValue().getAuthor(i) != null) {
             							String name = entry.getValue().getAuthor(i);
-            							int val = 1;
-            							if(devs.containsKey(name)) 
-            								val += devs.get(name);
-            								
-            							devs.put(name, val);
+            							
+            							if(devs.containsKey(name)) {
+            								ConflictCommitter dev = devs.get(name);
+            								dev.setConflicts(dev.getConflicts() + 1);
+            								devs.put(name, dev);
+            							}
+            							else 
+            								devs.put(name, new ConflictCommitter(name, 1, 0));
             						}
             					}
             					
-            					if(entry.getValue().getAuthor(0) != null && entry.getValue().getAuthor(0).equals(entry.getValue().getAuthor(1)))
+            					if(entry.getValue().getAuthor(0) != null && entry.getValue().getAuthor(0).equals(entry.getValue().getAuthor(1))) {
             						contAmbos += 1;
+        							ConflictCommitter dev0 = devs.get(entry.getValue().getAuthor(0));
+        							ConflictCommitter dev1 = devs.get(entry.getValue().getAuthor(1));
+        							
+        							dev0.setSelfConflicts(dev0.getSelfConflicts() + 1);
+        							dev1.setSelfConflicts(dev1.getSelfConflicts() + 1);
+            					}
             					else if(entry.getValue().getAuthor(0) == null || entry.getValue().getAuthor(1) == null)
             						contNull += 1;
-            					else
+            					else {
             						descricaoArquivos += String.format("%s,%s,%s;", entry.getValue().getFileName(), entry.getValue().getAuthor(0), entry.getValue().getAuthor(1));
+            					}
             				}
             			}
             		}
@@ -280,8 +291,8 @@ public class MACTool
         		Export.toCSV(repos, "general", GENERAL_HEADER, linesGeral);
         		
         		ArrayList<String> linesDev = new ArrayList<String>();
-        		for (Entry<String, Integer> dev : devs.entrySet()) 
-        			linesDev.add(dev.getKey()+","+dev.getValue());
+        		for (Entry<String, ConflictCommitter> dev : devs.entrySet()) 
+        			linesDev.add(dev.getKey()+","+dev.getValue().getConflicts()+","+dev.getValue().getSelfConflicts());
         		
         		Export.toCSV(repos, "dev", DEV_HEADEDR, linesDev);
         	}
