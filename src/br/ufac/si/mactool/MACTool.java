@@ -226,7 +226,7 @@ public class MACTool
             		//System.out.println("git diff --name-only --diff-filter=U");
             		List<String> arquivosList = RunGit.getListOfResult("git diff --name-only --diff-filter=U", repos.getProject());
             		
-            		if(numIntersec > 0)
+            		if(numIntersec >= 0)
             		{
             			//Gerando a lista de arquivos em conflito
             			HashMap<String, ConflictedFile> ac = new HashMap<String, ConflictedFile>();
